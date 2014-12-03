@@ -27,7 +27,7 @@ require Exporter;
 our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw(email);
 
-use version;our $VERSION = qv('0.0.5');
+use version;our $VERSION = qv('0.0.5.2');
 
 sub email { Mail::Sender->new()->easy(shift()); }
 
@@ -53,6 +53,7 @@ sub Mail::Sender::easy {
     my $eusr = $^O eq 'MSWin32' ? "(Windows: $>)" : getpwuid($>);
     my $file = File::Spec->rel2abs($0);
     my $host = $hostname_code->();
+    my $had_images;
  
     my @siteheaders = (
         qq{X-Mailer: use SimpleMood; - Sent via the email() function or easy() method of Mail/Sender/Easy.pm and/or SimpleMood.pm both by Daniel Muey.},
@@ -66,7 +67,38 @@ sub Mail::Sender::easy {
     eval {
         local $Mail::Sender::SITE_HEADERS = join("\015\012", @siteheaders) || '';
         
-        if($html) {
+        if($html 
+           && defined $attachments
+           && ref $attachments eq 'HASH'
+           && keys %{ $attachments } > 0) {
+            #(Taken from generated emails using Mozilla Thunderbird.)
+            #
+            #Image (PNG) and PDF attachment
+            # Content-Type: multipart/mixed
+            # boundary="boundary1"
+            # Fallback TEXT
+            # --boundary1
+            #    Content-Type: multipart/alternative
+            #    boundary="boundary2"
+            #    --boundary2
+            #       Content-Type: text/plain
+            #       TEXT
+            #    --boundary2
+            #       Content-Type: multipart/related
+            #       boundary="boundary3"
+            #       --boundary3
+            #          Content-Type: text/html
+            #          TEXT
+            #       --boundary3
+            #          Content-Type: image/png
+            #          TEXT
+            #       --boundary3--
+            #    --boundary2--
+            # --boundary1
+            #    Content-Type: application/pdf
+            #    TEXT
+            # --boundary1--
+
             $mail_ref->{'multipart'} = 'mixed';
             $sndr->OpenMultipart($mail_ref);
             $sndr->Part({
@@ -77,7 +109,48 @@ sub Mail::Sender::easy {
                 %{ $text_info }, 
                 'ctype'       => 'text/plain', 
                 'disposition' => 'NONE', 
-#               'msg'         => "$text$CRLF" 
+            });
+            $sndr->SendLineEnc($text);
+
+            #If we have images, put them one level deeper in the MIME chain
+            if(defined $attachments && ref $attachments eq 'HASH') {
+               $had_images = (grep { $attachments->{$_}{'_inline'} } (keys %{ $attachments })) ? 1 : 0;
+               if ($had_images) {
+                  $sndr->Part({
+                      'ctype' => 'multipart/related'
+                  });
+               }
+            }
+
+            $sndr->Part({
+                %{ $html_info },
+                'ctype'       => 'text/html',  
+                'disposition' => 'NONE', 
+            });
+            $sndr->SendLineEnc($html);
+
+        }
+        elsif ($html) {
+            #No attachments, just HTML. MIME should look like this:
+            #
+            # Content-Type: multipart/alternative
+            # boundary="boundary1"
+            # Fallback TEXT
+            # --boundary1
+            #    Content-Type: text/plain
+            #    TEXT
+            # --boundary1
+            #    Content-Type: text/html
+            #    TEXT
+            # --boundary1--
+            
+            $mail_ref->{'multipart'} = 'alternative';
+            $sndr->OpenMultipart($mail_ref);
+
+            $sndr->Part({
+                %{ $text_info }, 
+                'ctype'       => 'text/plain', 
+                'disposition' => 'NONE', 
             });
             $sndr->SendLineEnc($text);
 
@@ -85,19 +158,15 @@ sub Mail::Sender::easy {
                 %{ $html_info },
                 'ctype'       => 'text/html',  
                 'disposition' => 'NONE', 
-#               'msg'         => "$html$CRLF" 
             });
             $sndr->SendLineEnc($html);
-
-            $sndr->EndPart('multipart/alternative');
-        } 
+        }
         elsif(!$html && $attachments) {
             $sndr->OpenMultipart($mail_ref);
             $sndr->Body({
                 %{ $text_info },
                 'ctype'       => 'text/plain',
                 'disposition' => 'NONE',
-#               'msg'   => $text,
             });
             $sndr->SendLineEnc($text);
         } 
@@ -110,7 +179,23 @@ sub Mail::Sender::easy {
         }
 
         if(defined $attachments && ref $attachments eq 'HASH') {
-            for my $attach (keys %{ $attachments }) {
+            my @attach_array = keys %{ $attachments };
+
+            #sort attachments that define _inline attachments to be first
+            @attach_array = sort { ($attachments->{$b}{'_inline'} || '') cmp ($attachments->{$a}{'_inline'} || '') } @attach_array;
+
+            my $processed_all_images;
+
+            for my $attach (@attach_array) {
+
+                #Encountered first attachment that isn't an image
+                if((not defined $attachments->{ $attach }{'_inline'}) && $html && !$processed_all_images) {
+                   if ($had_images) {
+                      $sndr->EndPart('multipart/related');
+                   }
+                   $sndr->EndPart('multipart/alternative');
+                   $processed_all_images = 1;
+                }
 
                 $attachments->{ $attach }{'description'} = $attach 
                     if !defined $attachments->{ $attach }{'description'};
@@ -324,20 +409,21 @@ Send an email via SMTP with authentication, on an alternate port, a plain text p
     use Mail::Sender::Easy qw(email);   
 
     email({
-        'from'         => 'foo@bar.baz',
-        'to'           => 'you@ddre.ss',
-        'cc'           => 'your_pal@ddre.ss',
-        'subject'      => 'Perl is great!',
-        'priority'     => 2, # 1-5 high to low
-        'confirm'      => 'delivery, reading',
-        'smtp'         => '1.2.3.4',
-        'port'         => 26,
-        'auth'         => 'LOGIN',
-        'authid'       => 'foo@bar.baz',
-        'authpwd'      => 'protect_with_700_perms_or_get_it_from_input',
-        '_text'        => 'Hello *World* :)',    
-        '_html'        => 'Hello <b>World</b> <img src="cid:smile1" />',
-        '_attachments' => {
+        'from'          => 'foo@bar.baz',
+        'to'            => 'you@ddre.ss',
+        'cc'            => 'your_pal@ddre.ss',
+        'subject'       => 'Perl is great!',
+        'priority'      => 2, # 1-5 high to low
+        'confirm'       => 'delivery, reading',
+        'smtp'          => '1.2.3.4',
+        'port'          => 26,
+        'auth'          => 'LOGIN',
+        'authid'        => 'foo@bar.baz',
+        'authpwd'       => 'protect_with_700_perms_or_get_it_from_input',
+        '_no_leak_path' => 1,
+        '_text'         => 'Hello *World* :)',    
+        '_html'         => 'Hello <b>World</b> <img src="cid:smile1" />',
+        '_attachments'  => {
             'smiley.gif' => {
                 '_disptype'   => 'GIF Image',
                 '_inline'     => 'smile1',
