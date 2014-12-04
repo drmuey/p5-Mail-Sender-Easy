@@ -409,21 +409,20 @@ Send an email via SMTP with authentication, on an alternate port, a plain text p
     use Mail::Sender::Easy qw(email);   
 
     email({
-        'from'          => 'foo@bar.baz',
-        'to'            => 'you@ddre.ss',
-        'cc'            => 'your_pal@ddre.ss',
-        'subject'       => 'Perl is great!',
-        'priority'      => 2, # 1-5 high to low
-        'confirm'       => 'delivery, reading',
-        'smtp'          => '1.2.3.4',
-        'port'          => 26,
-        'auth'          => 'LOGIN',
-        'authid'        => 'foo@bar.baz',
-        'authpwd'       => 'protect_with_700_perms_or_get_it_from_input',
-        '_no_leak_path' => 1,
-        '_text'         => 'Hello *World* :)',    
-        '_html'         => 'Hello <b>World</b> <img src="cid:smile1" />',
-        '_attachments'  => {
+        'from'         => 'foo@bar.baz',
+        'to'           => 'you@ddre.ss',
+        'cc'           => 'your_pal@ddre.ss',
+        'subject'      => 'Perl is great!',
+        'priority'     => 2, # 1-5 high to low
+        'confirm'      => 'delivery, reading',
+        'smtp'         => '1.2.3.4',
+        'port'         => 26,
+        'auth'         => 'LOGIN',
+        'authid'       => 'foo@bar.baz',
+        'authpwd'      => 'protect_with_700_perms_or_get_it_from_input',
+        '_text'        => 'Hello *World* :)',    
+        '_html'        => 'Hello <b>World</b> <img src="cid:smile1" />',
+        '_attachments' => {
             'smiley.gif' => {
                 '_disptype'   => 'GIF Image',
                 '_inline'     => 'smile1',
