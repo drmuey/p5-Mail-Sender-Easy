@@ -19,4 +19,5 @@ Revision history for Perl extension Mail::Sender::Easy.
 
 ??
 	- rt 44603: control X-Mailer headers via _xmailer attribute
+	- POD typo
 	-

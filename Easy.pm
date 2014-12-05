@@ -329,7 +329,7 @@ If not specified its not "inline", its just attached :)
 
 =back
 
-The _disptype and _inline are used to build the actual "dispositon" part which is described in Mial::Sender's docs if you want to know the nitty gritty.
+The _disptype and _inline are used to build the actual "dispositon" part which is described in Mail::Sender's docs if you want to know the nitty gritty.
 
 =head3 _xmailer
 
