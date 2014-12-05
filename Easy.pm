@@ -48,24 +48,42 @@ sub Mail::Sender::easy {
     delete $mail_ref->{'_html_info'} if exists $mail_ref->{'_html_info'};
     delete $html_info->{$_} for qw(ctype disposition msg);
 
-    my $time = time;
-    my $user = $^O eq 'MSWin32' ? "(Windows: $<)" : getpwuid($<);
-    my $eusr = $^O eq 'MSWin32' ? "(Windows: $>)" : getpwuid($>);
-    my $file = File::Spec->rel2abs($0);
-    my $host = $hostname_code->();
- 
-    my @siteheaders = (
-        qq{X-Mailer: use SimpleMood; - Sent via the email() function or easy() method of Mail/Sender/Easy.pm and/or SimpleMood.pm both by Daniel Muey.},
-        qq{X-Mailer: Sent via $file ($0) on $host by uid $< ($user) / euid $> ($eusr) at $time (unix epoch)},
-    );
-    push @siteheaders, qq(X-Mailer: SMTP Auth provided by (object data) $sndr->{'authid'}) if $sndr->{'authid'};
-    push @siteheaders, qq(X-Mailer: SMTP Auth provided by (hashref arg) $mail_ref->{'authid'}) if $mail_ref->{'authid'};
+    my @siteheaders;
+    my $x_mailer = delete $mail_ref->{'_xmailer'};
+
+    if ($x_mailer) {
+        my $time = time;
+        my $user = $^O eq 'MSWin32' ? "(Windows: $<)" : getpwuid($<);
+        my $eusr = $^O eq 'MSWin32' ? "(Windows: $>)" : getpwuid($>);
+        my $file = File::Spec->rel2abs($0);
+        my $host = $hostname_code->();
+
+        if ($x_mailer eq 'forensic') {
+            push @siteheaders, "X-Mailer: Sent via $file ($0) on $host by uid $< ($user) / euid $> ($eusr) at $time (unix epoch)";
+            push @siteheaders, "X-Mailer: SMTP Auth provided by (object data) $sndr->{'authid'}" if $sndr->{'authid'};
+            push @siteheaders, "X-Mailer: SMTP Auth provided by (hashref arg) $mail_ref->{'authid'}" if $mail_ref->{'authid'};
+        }
+        elsif (ref($x_mailer) eq 'ARRAY') {
+            for my $item (@{$x_mailer}) {
+                $item =~ s/(?:\n|\r)+//g;
+                push @siteheaders, "X-Mailer: $item";
+            }
+        }
+        elsif (length($x_mailer) && $x_mailer ne '1') {
+            $x_mailer =~ s/(?:\n|\r)+//g;
+            push @siteheaders, "X-Mailer: $x_mailer";
+        }
+        else {
+            push @siteheaders, "X-Mailer: Sent via perl module Mail::Sender:Easy v$VERSION";
+        }
+    }
 
     croak q{You must specify the "_text" key.} if !defined $text;
 
     eval {
         local $Mail::Sender::SITE_HEADERS = join("\015\012", @siteheaders) || '';
-        
+        local $Mail::Sender::NO_X_MAILER = 1;
+
         if($html) {
             $mail_ref->{'multipart'} = 'mixed';
             $sndr->OpenMultipart($mail_ref);
@@ -312,6 +330,36 @@ If not specified its not "inline", its just attached :)
 =back
 
 The _disptype and _inline are used to build the actual "dispositon" part which is described in Mial::Sender's docs if you want to know the nitty gritty.
+
+=head3 _xmailer
+
+After v0.0.5 no X-Mailer headers are sent by default.
+
+When true, the value indicates what X-Mailer headers to send.
+
+The values can be:
+
+=over 4
+
+=item 1
+
+Add a simple generic X-Mailer header:
+
+    X-Mailer: Sent via perl module Mail::Sender:Easy vN.N
+
+=item STRING
+
+Add an X-Mailer header for STRING (No need to prepend 'X-Mailer: ' to the string).
+
+=item ARRAY_REF
+
+Add an X-Mailer header for each item in the array (No need to prepend 'X-Mailer: ' to the items).
+
+=item 'forensic'
+
+Add some detailed information about the script/uid/gid/auth in one or more X-Mailer headers.
+
+=back
 
 =head1 EXPORT
 

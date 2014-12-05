@@ -18,4 +18,5 @@ Revision history for Perl extension Mail::Sender::Easy.
 	- re bundled without Mac's ._ files in the tarball
 
 ??
+	- rt 44603: control X-Mailer headers via _xmailer attribute
 	-
