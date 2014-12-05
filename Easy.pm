@@ -341,7 +341,7 @@ The values can be:
 
 =over 4
 
-=item 1
+=item '1'
 
 Add a simple generic X-Mailer header:
 
