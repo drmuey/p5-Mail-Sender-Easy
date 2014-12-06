@@ -81,7 +81,7 @@ sub Mail::Sender::easy {
     croak q{You must specify the "_text" key.} if !defined $text;
 
     eval {
-        local $Mail::Sender::SITE_HEADERS = join("\015\012", @siteheaders) || '';
+        local $Mail::Sender::SITE_HEADERS = join("\015\012", @siteheaders) || undef;
         local $Mail::Sender::NO_X_MAILER = 1;
 
         if($html) {
